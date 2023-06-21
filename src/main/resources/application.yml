@@ -1,0 +1,61 @@
+server:
+  port: 8000
+
+spring:
+  application:
+    name: apigateway-service
+
+  # 게이트웨이 라우팅
+  cloud:
+    gateway:
+      default-filters: # 모든 라우팅에 적용되는 global 필터
+        - name: LoggingFilter
+          args:
+            baseMessage: Spring Cloud Gateway Logging
+            preLogger: true
+            postLogger: true
+      routes:
+        - id: first-service
+          uri: lb://FIRST-SERVICE  # 유레카 서버에 등록된 서비스 이름
+          predicates:
+            - Path=/first-service/**
+          filters:  # 서비스마다 적용되는 필터
+            - AddRequestHeader=first-request, first-request-header
+            - AddResponseHeader=first-response, first-response-header
+        - id: second-service
+          uri: lb://SECOND-SERVICE  # 유레카 서버에 등록된 서비스 이름
+          predicates:
+            - Path=/second-service/**
+          filters:
+            - AddRequestHeader=second-request, second-request-header
+            - AddResponseHeader=second-response, second-response-header
+        - id: user-service
+          uri: lb://USER-SERVICE  # 유레카 서버에 등록된 서비스 이름
+          predicates:
+              - Path=/user-service/auth/**  # 이 경로에 대해선 인증 필터 불필요.
+        # Path는 리스트로 작성 불가능. 그래서 같은 이름의 서비스를 다른 Path로 여러 번 라우트에 등록해줘야 한다.
+        - id: user-service
+          uri: lb://USER-SERVICE  # 유레카 서버에 등록된 서비스 이름
+          predicates:
+            - Path=/user-service/users/**  # 이 경로에 대해선 인증 필터 적용 필요
+#            - Method=GET, PUT, DELETE  # 위 경로에선 GET, PUT, DELETE 메소드만 허용 (acl 메서드)
+          filters:
+            - name: AuthenticationFilter
+              args:
+                secret: userId
+        - id: user-service
+          uri: lb://USER-SERVICE  # 유레카 서버,에 등록된 서비스 이름
+          predicates:
+            - Path=/user-service/healthy-check/**
+
+# 유레카 클라이언트 세팅
+eureka:
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: http://localhost:8761/eureka
+
+token:
+  expiration_time: 86400000
+  secret: userId
